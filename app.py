@@ -57,12 +57,14 @@ def index():
             user.id_token_json = decode_token(user.id_token)
         if user.access_token:
             user.access_token_json = decode_token(user.access_token)
-
+    else:
+        _app.logger.debug("no session")
     if is_logged_in:
         return render_template('index.html',
                             server_name=urlparse(_config['authorization_endpoint']).netloc,
                             session=user)
     else:
+        _app.logger.debug("not logged")
         return render_template('welcome.html')
 
 
@@ -152,11 +154,14 @@ def call_api():
                     request.add_header('User-Agent', 'CurityExample/1.0')
                     request.add_header("Authorization", "Bearer %s" % user.access_token)
                     request.add_header("Accept", 'application/json')
+                    _app.logger.debug("call api endpoint : %s" % _config['api_endpoint'])
                     response = urllib2.urlopen(request)
                     user.api_response = {'code': response.code, 'data': response.read()}
                 except urllib2.HTTPError as e:
+                    _app.logger.error(e.message if len(e.message) > 0 else e)
                     user.api_response = {'code': e.code, 'data': e.read()}
                 except Exception as e:
+                    _app.logger.error(e.message)
                     message = e.message if len(e.message) > 0 else "unknown error"
                     user.api_response = {"code": "unknown error", "data": message}
             else:
@@ -185,8 +190,10 @@ def oauth_callback():
         return create_error("No code_verifier in session")
 
     try:
+        _app.logger.debug("call token endpoint")
         token_data = _client.get_token(request.args['code'], session["code_verifier"])
     except Exception as e:
+        print e
         return create_error('Could not fetch token(s)', e)
     session.pop('state', None)
 

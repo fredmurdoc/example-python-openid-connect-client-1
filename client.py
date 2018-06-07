@@ -119,6 +119,7 @@ class Client:
         try:
             token_response = self.urlopen(self.config['token_endpoint'], urllib.urlencode(data), context=self.ctx)
         except urllib2.URLError as te:
+            print te
             print "Could not exchange code for tokens"
             raise te
         return json.loads(token_response.read())
