@@ -38,6 +38,8 @@ class Client:
         else:
             print "No discovery url configured, all endpoints needs to be configured manually"
 
+        if 'algorithm' not in self.config:
+            self.config['algorithm'] = "S256"
 
         # Mandatory settings
         if 'authorization_endpoint' not in self.config:
@@ -97,7 +99,7 @@ class Client:
 
         code_challenge = tools.base64_urlencode(hashlib.sha256(code_verifier).digest())
 
-        request_args = self.__authn_req_args(state, scope, code_challenge, "S256")
+        request_args = self.__authn_req_args(state, scope, code_challenge, self.config['algorithm'])
         if acr: request_args["acr_values"] = acr
         if forceAuthN: request_args["prompt"] = "login"
         login_url = "%s?%s" % (self.config['authorization_endpoint'], urllib.urlencode(request_args))
@@ -111,15 +113,17 @@ class Client:
         """
         data = {'client_id': self.config['client_id'], "client_secret": self.config['client_secret'],
                 'code': code,
-                "code_verifier": code_verifier,
                 'redirect_uri': self.config['redirect_uri'],
                 'grant_type': 'authorization_code'}
-
         # Exchange code for tokens
         try:
             token_response = self.urlopen(self.config['token_endpoint'], urllib.urlencode(data), context=self.ctx)
+            print "ok"
         except urllib2.URLError as te:
+            print "Error : "
             print te
+            print "Reason : "
+            print te.reason
             print "Could not exchange code for tokens"
             raise te
         return json.loads(token_response.read())
@@ -132,6 +136,11 @@ class Client:
         :context: ssl context
         :return the request response
         """
+        http_logger = urllib2.HTTPHandler(debuglevel = 10)
+        opener = urllib2.build_opener(http_logger) # put your other handlers here too!
+        urllib2.install_opener(opener)
+        print("data : ")
+        print(data)
         headers = {
             'User-Agent': 'CurityExample/1.0',
             'Accept': 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8'
@@ -153,7 +162,7 @@ class Client:
                 'code_challenge': code_challenge,
                 'code_challenge_method': code_challenge_method,
                 'redirect_uri': self.config['redirect_uri']}
-
+        print(args)
         if 'authn_parameters' in self.config:
             args.update(self.config['authn_parameters'])
         return args

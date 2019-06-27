@@ -1,16 +1,12 @@
 {
-  "client_id": "client-1",
-  "client_secret": "Password1",
-  "audience": "client-one",
-  "redirect_uri": "https://localhost:5443/callback",
-  "scope": "openid read",
-  "authorization_endpoint": "https://nordicapis.curity.io/oauth/v2/authorize",
-  "token_endpoint": "https://nordicapis.curity.io/oauth/v2/token",
-  "logout_endpoint": "https://nordicapis.curity.io/authn/authenticate/logout",
-  "revocation_endpoint": "https://nordicapis.curity.io/oauth/v2/revoke",
-  "jwks_uri": "https://nordicapis.curity.io/~/jwks",
-  "issuer": "https://nordicapis.curity.io/~",
-  "api_endpoint": "https://nordicapis-api.curity.io/hello_world",
-  "base_url": "https://localhost:5443",
-  "verify_ssl_server": true
+    "client_id": "rp-rocketchat-pp-id",
+    "client_secret": "5ad1c0d6c000986c8d851f195a52d2abd407857d",
+    "audience": "rp-example",
+    "redirect_uri": "https://tchat-pp.nantesmetropole.fr/_oauth/lemonldap",
+    "scope": "openid profile email",
+    "discovery_url" : "https://auth-pp.nantesmetropole.fr/.well-known/openid-configuration",
+    "api_endpoint": "https://auth-pp.nantesmetropole.fr/oauth2/userinfo",
+    "base_url": "https://lx54483.stations.nantes.net:5443",
+    "verify_ssl_server": false,
+    "debug" : true
 }

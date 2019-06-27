@@ -8,7 +8,7 @@ services:
       - AUTHORIZATION_ENDPOINT=https://192.168.1.213:8443/dev/oauth/authorize
       - TOKEN_ENDPOINT=https://192.168.1.213:8443/dev/oauth/token
       - REVOCATION_ENDPOINT=https://192.168.1.213:8443/revoke
-      - ISSUER=se.curity
+      - ISSUER=security
       - CLIENT_ID=python-client
       - CLIENT_SECRET=Password1
       - REDIRECT_URI=https://localhost:5443/callback

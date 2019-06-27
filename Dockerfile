@@ -25,4 +25,4 @@ ADD templates /oidc-example/templates
 ADD settings.json /oidc-example/settings.json
 ADD *.py /oidc-example/
 
-CMD ["python", "app.py"]
+ENTRYPOINT ["python", "app.py"]

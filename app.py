@@ -1,4 +1,4 @@
-##########################################################################
+#########################################################################
 # Copyright 2016 Curity AB
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,6 +47,7 @@ def index():
     """
     :return: the index page with the tokens, if set.
     """
+    _app.logger.debug("default route /")
     user = None
     is_logged_in = False
     if 'session_id' in session:
@@ -54,9 +55,13 @@ def index():
     if user:
         is_logged_in = True
         if user.id_token:
+            _app.logger.debug("parse id_token")
             user.id_token_json = decode_token(user.id_token)
+            _app.logger.debug("id_token parsed")
         if user.access_token:
+            _app.logger.debug("parse access_token")
             user.access_token_json = decode_token(user.access_token)
+            _app.logger.debug("access_token parsed")
     else:
         _app.logger.debug("no session")
     if is_logged_in:
@@ -76,10 +81,11 @@ def start_code_flow():
     provided_scopes = request.args.get("scope")
     default_scopes = _client.config['scope']
     scopes = provided_scopes if provided_scopes else default_scopes
-
+    _app.logger.debug("call oidc client auth url")
     login_url = _client.get_authn_req_url(session, request.args.get("acr", None),
                                           request.args.get("forceAuthN", False),
                                           scopes)
+    _app.logger.debug("redirect")
     return redirect(login_url)
 
 
@@ -91,11 +97,20 @@ def logout():
     """
     if 'session_id' in session:
         del _session_store[session['session_id']]
+    _app.logger.info("Kill sesssion")
     session.clear()
+    logout_endpoint = '/'
     if 'logout_endpoint' in _config:
         print "Logging out against", _config['logout_endpoint']
-        return redirect(_config['logout_endpoint'] + '?redirect_uri=' + _base_url)
-    return redirect_with_baseurl('/')
+        _app.logger.info("Logging out against %s" % (_config['logout_endpoint']))
+        logout_endpoint = _config['logout_endpoint']
+
+
+    if 'post_logout_redirect_uri' in _config:
+        _app.logger.info("Logging out and post_lougout_redirect to  %s" % (_config['post_logout_redirect_uri']))
+        return redirect(logout_endpoint + '?post_logout_redirect_uri=' + _config['post_logout_redirect_uri'])
+
+    return redirect_with_baseurl(logout_endpoint)
 
 
 @_app.route('/refresh')
@@ -154,9 +169,11 @@ def call_api():
                     request.add_header('User-Agent', 'CurityExample/1.0')
                     request.add_header("Authorization", "Bearer %s" % user.access_token)
                     request.add_header("Accept", 'application/json')
-                    _app.logger.debug("call api endpoint : %s" % _config['api_endpoint'])
+                    _app.logger.debug("call api endpoint : %s with Bearer : %s" % (_config['api_endpoint'], user.access_token))
+                    _app.logger.debug(request.headers)
                     response = urllib2.urlopen(request)
                     user.api_response = {'code': response.code, 'data': response.read()}
+                    _app.logger.debug("api response : %s" % str(user.api_response))
                 except urllib2.HTTPError as e:
                     _app.logger.error(e.message if len(e.message) > 0 else e)
                     user.api_response = {'code': e.code, 'data': e.read()}
@@ -180,6 +197,7 @@ def oauth_callback():
     Called when the resource owner is returning from the authorization server
     :return:redirect to / with user info stored in the session.
     """
+    _app.logger.debug("callback called")
     if 'state' not in session or session['state'] != request.args['state']:
         return create_error('Missing or invalid state')
 
@@ -199,23 +217,26 @@ def oauth_callback():
 
     # Store in basic server session, since flask session use cookie for storage
     user = UserSession()
-
+    _app.logger.debug("token : ")
+    _app.logger.debug(token_data)
     if 'access_token' in token_data:
         user.access_token = token_data['access_token']
 
-    if _jwt_validator and 'id_token' in token_data:
+    if _jwt_validator and 'id_token' in token_data and token_data['id_token'] != None:
         # validate JWS; signature, aud and iss.
         # Token type, access token, ref-token and JWT
         if 'issuer' not in _config:
             return create_error('Could not validate token: no issuer configured')
 
         try:
+            _app.logger.debug("jwt_validator.validate")
             _jwt_validator.validate(token_data['id_token'], _config['issuer'], _config['audience'])
         except BadSignature as bs:
             return create_error('Could not validate token: %s' % bs.message)
         except Exception as ve:
             return create_error("Unexpected exception: %s" % ve.message)
 
+        _app.logger.debug("jwt_validator.validated")
         user.id_token = token_data['id_token']
 
     if 'refresh_token' in token_data:
@@ -223,7 +244,7 @@ def oauth_callback():
 
     session['session_id'] = generate_random_string()
     _session_store[session['session_id']] = user
-
+    _app.logger.debug("redirect to root")
     return redirect_with_baseurl('/')
 
 
@@ -266,7 +287,7 @@ def redirect_with_baseurl(path):
 if __name__ == '__main__':
     # load the config
     _config = load_config()
-
+    _app.logger.debug(str(_config))
     _client = Client(_config)
 
     # load the jwk set.

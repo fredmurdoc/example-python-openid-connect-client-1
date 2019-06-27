@@ -21,7 +21,8 @@ from jwkest.jwk import SYMKey, KEYS
 from jwkest.jws import JWS
 from tools import base64_urldecode
 from tools import get_ssl_context
-
+import logging
+import sys
 
 class JwtValidatorException(Exception):
     pass
@@ -29,7 +30,9 @@ class JwtValidatorException(Exception):
 
 class JwtValidator:
     def __init__(self, config):
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
         print 'Getting ssl context for jwks_uri'
+        logging.info('Getting ssl context for jwks_uri')
         self.ctx = get_ssl_context(config)
 
         self.jwks_uri = config['jwks_uri']
@@ -53,11 +56,14 @@ class JwtValidator:
         jws = JWS(alg=header['alg'])
         # Raises exception when signature is invalid
         try:
+            logging.debug('jws.verify_compact, length keys : %d' % (len(self.jwks)))
             jws.verify_compact(jwt, self.jwks)
+            logging.debug('jws.verify_compact OK')
         except Exception as e:
             print "Exception validating signature"
             raise JwtValidatorException(e)
         print "Successfully validated signature."
+        logging.info("Successfully validated signature.")
 
     def get_jwks_data(self):
         request = urllib2.Request(self.jwks_uri)        
@@ -65,7 +71,9 @@ class JwtValidator:
         request.add_header('User-Agent', 'CurityExample/1.0')
 
         try:
+            logging.debug("get_jwks_data to %s " % (self.jwks_uri))
             jwks_response = urllib2.urlopen(request, context=self.ctx)
+            logging.debug("get_jwks_data loaded ")
         except Exception as e:
             print "Error fetching JWKS", e
             raise e
@@ -74,7 +82,15 @@ class JwtValidator:
     def load_keys(self):
         # load the jwk set.
         jwks = KEYS()
-        jwks.load_jwks(self.get_jwks_data())
+        try:
+            logging.debug("load_keys")
+            jwks.load_jwks(self.get_jwks_data())
+            logging.debug("keys loaded")
+        except Exception as e:
+            print "Error in loading keys from endpoint, continue..."
+        logging.debug("keys loaded %s " % (str(jwks)))
+        logging.debug("create sym key")    
         key = SYMKey(key=self.client_secret)
+        logging.debug("append sym key")    
         jwks.append(key)
         return jwks

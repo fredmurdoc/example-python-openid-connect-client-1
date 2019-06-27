@@ -18,7 +18,10 @@ import base64
 import random
 import string
 import ssl
+import logging
+import sys
 
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 def base64_urldecode(s):
     ascii_string = str(s)
@@ -57,10 +60,12 @@ def get_ssl_context(config):
     """
     :return a ssl context with verify and hostnames settings
     """
+    logging.debug("create_default_context")
     ctx = ssl.create_default_context()
-
+    
     if 'verify_ssl_server' in config and not bool(config['verify_ssl_server']):
         print 'Not verifying ssl certificates'
+        logging.info("Not verifying ssl certificates")
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
     return ctx
