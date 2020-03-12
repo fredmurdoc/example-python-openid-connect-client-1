@@ -147,6 +147,7 @@ class Client:
         }
         
         request = urllib2.Request(url, data, headers)
+        print("url %s " % request.get_full_url())
         return urllib2.urlopen(request, context=context)
 
 
