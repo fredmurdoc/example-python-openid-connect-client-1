@@ -1,12 +1,11 @@
 {
-    "client_id": "rp-rocketchat-pp-id",
-    "client_secret": "5ad1c0d6c000986c8d851f195a52d2abd407857d",
-    "audience": "rp-example",
-    "redirect_uri": "https://tchat-pp.nantesmetropole.fr/_oauth/lemonldap",
-    "scope": "openid profile email",
-    "discovery_url" : "https://auth-pp.nantesmetropole.fr/.well-known/openid-configuration",
-    "api_endpoint": "https://auth-pp.nantesmetropole.fr/oauth2/userinfo",
-    "base_url": "https://lx54483.stations.nantes.net:5443",
-    "verify_ssl_server": false,
-    "debug" : true
+  "client_id": "rp-test-pp-id",
+  "client_secret": "m5tU6JYMjcLX5quy",
+  "audience": "rp-test-pp-id"",
+  "redirect_uri": "https://client.montest.com:5443/callback",
+  "scope": "openid profile email address phone",
+  "discovery_url": "https://lemondlap/.wel-known/openid-configuration",
+  "api_endpoint": "https://lemonldap/oauth2/userinfo",
+  "base_url": "https://lemonldap/",
+  "verify_ssl_server": true
 }
