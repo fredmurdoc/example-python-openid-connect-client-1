@@ -1,16 +1,10 @@
 version: '2'
 services:
   oidc-example:
-    image: curity/oidc-python-demo:0.1
+    #image: curity/oidc-python-demo:0.1
+    image: fgo_oidc_client:latest
     ports:
       - 5443:5443
     environment:
-      - AUTHORIZATION_ENDPOINT=https://192.168.1.213:8443/dev/oauth/authorize
-      - TOKEN_ENDPOINT=https://192.168.1.213:8443/dev/oauth/token
-      - REVOCATION_ENDPOINT=https://192.168.1.213:8443/revoke
-      - ISSUER=security
-      - CLIENT_ID=python-client
-      - CLIENT_SECRET=Password1
-      - REDIRECT_URI=https://localhost:5443/callback
       - VERIFY_SSL_SERVER=false
 
