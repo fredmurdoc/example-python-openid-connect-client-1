@@ -178,9 +178,15 @@
         <div class="col-md-6">
             {% if session %}
               {% if not error %}
-                <div class="btn-group btn-group-justified mb" role="group">
-                    <a href="/call-api" class="btn btn-default" type="button">Request data from api</a>
-                </div>
+                
+                <form action="/call-api" method="get">
+                    <div class="form-group">
+                        <input type="text" class="form-control" value="{{ session.api_url }}" id="url" name="url" placeholder="URL API">
+                    </div>
+                    <div style="margin-bottom: 1em">
+                        <button type="submit" class="btn btn-default btn-group-justified mb">Request data from api</button>
+                    </div>
+                </form>
               {%  endif %}
                 <form action="/start-login" method="get">
                     <div class="form-group">
@@ -196,6 +202,7 @@
                         <button type="submit" class="btn btn-default btn-group-justified mb">Restart Login</button>
                     </div>
                 </form>
+
 		<form action="/logout" method="get">
                     <div style="margin-bottom: 1em">
                         <button type="submit" class="btn btn-default btn-group-justified mb">Logout</button>

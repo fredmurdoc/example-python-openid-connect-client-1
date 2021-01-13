@@ -1,11 +1,13 @@
 {
-  "client_id": "rp-test-pp-id",
-  "client_secret": "m5tU6JYMjcLX5quy",
-  "audience": "rp-test-pp-id"",
-  "redirect_uri": "https://client.montest.com:5443/callback",
-  "scope": "openid profile email address phone",
-  "discovery_url": "https://lemondlap/.wel-known/openid-configuration",
-  "api_endpoint": "https://lemonldap/oauth2/userinfo",
-  "base_url": "https://lemonldap/",
-  "verify_ssl_server": true
+  "web" : {
+    "client_id": "rp-example",
+    "client_secret": "rp-example",
+    "audience": "rp-example",
+    "redirect_uris": ["https://localhost:5443/callback"],
+    "scope": "openid profile email address phone",  
+    "auth_uri": "http://auth.example.com/oauth2/authorize",
+    "token_uri": "http://auth.example.com/oauth2/token",
+    "userinfo_uri": "http://auth.example.com/oauth2/userinfo",
+    "issuer": "http://auth.example.com/"
+  }
 }

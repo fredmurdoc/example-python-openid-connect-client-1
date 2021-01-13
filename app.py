@@ -16,30 +16,28 @@
 
 import json
 import sys
-import urllib2
+import urllib
 from flask import redirect, request, render_template, session, Flask
-from jwkest import BadSignature
-from urlparse import urlparse
-
-from client import Client
-from tools import decode_token, generate_random_string
-from validator import JwtValidator
-from config import Config
-
+from flask_oidc_ext import OpenIDConnect
+from oauth2client.client import OAuth2Credentials
+import requests
 _app = Flask(__name__)
 
+_app.config.update({
+    'SECRET_KEY': 'SomethingNotEntirelySecret',
+    'TESTING': True,
+    'DEBUG': True,
+    'OIDC_CLIENT_SECRETS': 'settings.json',
+    'OIDC_ID_TOKEN_COOKIE_SECURE': False,
+    'OIDC_REQUIRE_VERIFIED_EMAIL': False,
+    'OIDC_USER_INFO_ENABLED': True,
+    'OIDC_OPENID_REALM': 'flask-demo',
+    'OIDC_SCOPES': ['openid', 'email', 'profile'],
+    'OIDC_INTROSPECTION_AUTH_METHOD': 'client_secret_post',
+    'API_URL' : 'http://api.example.com/api/pet/findByStatus?status=available' 
+})
+oidc = OpenIDConnect(_app)
 
-class UserSession:
-    def __init__(self):
-        pass
-
-    access_token = None
-    refresh_token = None
-    id_token = None
-    access_token_json = None
-    id_token_json = None
-    name = None
-    api_response = None
 
 
 @_app.route('/')
@@ -47,46 +45,28 @@ def index():
     """
     :return: the index page with the tokens, if set.
     """
+    if "api_url" not in session :
+        session["api_url"] = _app.config.get("API_URL")
+    if session["api_url"] is None or  session["api_url"]== '' :    
+        session["api_url"] = _app.config.get("API_URL")
     _app.logger.debug("default route /")
-    user = None
-    is_logged_in = False
-    if 'session_id' in session:
-        user = _session_store.get(session['session_id'])
-    if user:
-        is_logged_in = True
-        if user.id_token:
-            _app.logger.debug("parse id_token")
-            user.id_token_json = decode_token(user.id_token)
-            _app.logger.debug("id_token parsed")
-        if user.access_token:
-            _app.logger.debug("parse access_token")
-            user.access_token_json = decode_token(user.access_token)
-            _app.logger.debug("access_token parsed")
-    else:
-        _app.logger.debug("no session")
-    if is_logged_in:
-        return render_template('index.html',
-                            server_name=urlparse(_config['authorization_endpoint']).netloc,
-                            session=user)
+    if oidc.user_loggedin:
+        _app.logger.debug("logged")
+        return render_template('index.html')
+        
     else:
         _app.logger.debug("not logged")
         return render_template('welcome.html')
-
+    
 
 @_app.route('/start-login')
+@oidc.require_login
 def start_code_flow():
     """
     :return: redirects to the authorization server with the appropriate parameters set.
     """
-    provided_scopes = request.args.get("scope")
-    default_scopes = _client.config['scope']
-    scopes = provided_scopes if provided_scopes else default_scopes
-    _app.logger.debug("call oidc client auth url")
-    login_url = _client.get_authn_req_url(session, request.args.get("acr", None),
-                                          request.args.get("forceAuthN", False),
-                                          scopes)
-    _app.logger.debug("redirect")
-    return redirect(login_url)
+    _app.logger.debug("start_code_flow")
+    return render_template('index.html')
 
 
 @_app.route('/logout')
@@ -95,227 +75,67 @@ def logout():
     Logout clears the session, along with the tokens
     :return: redirects to /
     """
-    if 'session_id' in session:
-        del _session_store[session['session_id']]
-    _app.logger.info("Kill sesssion")
-    session.clear()
-    logout_endpoint = '/'
-    if 'logout_endpoint' in _config:
-        print "Logging out against", _config['logout_endpoint']
-        _app.logger.info("Logging out against %s" % (_config['logout_endpoint']))
-        logout_endpoint = _config['logout_endpoint']
-
-
-    if 'post_logout_redirect_uri' in _config:
-        _app.logger.info("Logging out and post_lougout_redirect to  %s" % (_config['post_logout_redirect_uri']))
-        return redirect(logout_endpoint + '?post_logout_redirect_uri=' + _config['post_logout_redirect_uri'])
-
-    return redirect_with_baseurl(logout_endpoint)
-
-
-@_app.route('/refresh')
-def refresh():
-    """
-    Refreshes the access token using the refresh token
-    :return: redirects to /
-    """
-    user = _session_store.get(session['session_id'])
-    try:
-        token_data = _client.refresh(user.refresh_token)
-    except Exception as e:
-        create_error('Could not refresh Access Token', e)
-        return
-    user.access_token = token_data['access_token']
-    user.refresh_token = token_data['refresh_token']
-    return redirect_with_baseurl('/')
-
-
-@_app.route('/revoke')
-def revoke():
-    """
-    Revokes the access and refresh token and clears the sessions
-    :return: redirects to /
-    """
-    if 'session_id' in session:
-        user = _session_store.get(session['session_id'])
-        if not user:
-            redirect_with_baseurl('/')
-
-        if user.refresh_token:
-            try:
-                _client.revoke(user.refresh_token)
-            except urllib2.URLError as e:
-                return create_error('Could not revoke refresh token', e)
-            user.refresh_token = None
-
-    return redirect_with_baseurl('/')
+    return render_template('welcome.html')
+        
+   
 
 
 @_app.route('/call-api')
+@oidc.require_login
 def call_api():
     """
     Call an api using the Access Token
     :return: the index template with the data from the api in the parameter 'data'
     """
-    if 'session_id' in session:
-        user = _session_store.get(session['session_id'])
-        if not user:
-            return redirect_with_baseurl('/')
-        if 'api_endpoint' in _config:
-            user.api_response = None
-            if user.access_token:
-                try:
-                    request = urllib2.Request(_config['api_endpoint'])
-                    request.add_header('User-Agent', 'CurityExample/1.0')
-                    request.add_header("Authorization", "Bearer %s" % user.access_token)
-                    request.add_header("Accept", 'application/json')
-                    _app.logger.debug("call api endpoint : %s with Bearer : %s" % (_config['api_endpoint'], user.access_token))
-                    _app.logger.debug(request.headers)
-                    response = urllib2.urlopen(request)
-                    user.api_response = {'code': response.code, 'data': response.read()}
-                    _app.logger.debug("api response : %s" % str(user.api_response))
-                except urllib2.HTTPError as e:
-                    _app.logger.error(e.message if len(e.message) > 0 else e)
-                    user.api_response = {'code': e.code, 'data': e.read()}
-                except Exception as e:
-                    _app.logger.error(e.message)
-                    message = e.message if len(e.message) > 0 else "unknown error"
-                    user.api_response = {"code": "unknown error", "data": message}
-            else:
-                user.api_response = None
-                print 'No access token in session'
-        else:
-            user.api_response = None
-            print 'No API endpoint configured'
+    url = request.args.get('url')
+    if url is None:
+        return render_template('index.html', e = "Pas d'url valide")
+    
+    api_url = url
+    
+    session["api_url"] = api_url
+    info = oidc.user_getinfo(['preferred_username', 'email', 'sub'])
+    
+    username = info.get('preferred_username')
+    email = info.get('email')
+    user_id = info.get('sub')
+    _app.logger.info("username %s" % username)
+    _app.logger.info("email %s" % email)
+    _app.logger.info("user_id %s" % user_id)
 
-    return redirect_with_baseurl('/')
+    
+    if not user_id in oidc.credentials_store:
+        _app.logger.debug("no user_id is store")
+        return redirect('/start-login')
 
-
-@_app.route('/callback')
-def oauth_callback():
-    """
-    Called when the resource owner is returning from the authorization server
-    :return:redirect to / with user info stored in the session.
-    """
-    _app.logger.debug("callback called")
-    if 'state' not in session or session['state'] != request.args['state']:
-        return create_error('Missing or invalid state')
-
-    if 'code' not in request.args:
-        return create_error('No code in response')
-
-    if "code_verifier" not in session:
-        return create_error("No code_verifier in session")
-
-    try:
-        _app.logger.debug("call token endpoint")
-        token_data = _client.get_token(request.args['code'], session["code_verifier"])
-    except Exception as e:
-        print e
-        return create_error('Could not fetch token(s)', e)
-    session.pop('state', None)
-
-    # Store in basic server session, since flask session use cookie for storage
-    user = UserSession()
-    _app.logger.debug("token : ")
-    _app.logger.debug(token_data)
-    if 'access_token' in token_data:
-        user.access_token = token_data['access_token']
-
-    if _jwt_validator and 'id_token' in token_data and token_data['id_token'] != None:
-        # validate JWS; signature, aud and iss.
-        # Token type, access token, ref-token and JWT
-        if 'issuer' not in _config:
-            return create_error('Could not validate token: no issuer configured')
-
-        try:
-            _app.logger.debug("jwt_validator.validate")
-            _jwt_validator.validate(token_data['id_token'], _config['issuer'], _config['audience'])
-        except BadSignature as bs:
-            return create_error('Could not validate token: %s' % bs.message)
-        except Exception as ve:
-            return create_error("Unexpected exception: %s" % ve.message)
-
-        _app.logger.debug("jwt_validator.validated")
-        user.id_token = token_data['id_token']
-
-    if 'refresh_token' in token_data:
-        user.refresh_token = token_data['refresh_token']
-
-    session['session_id'] = generate_random_string()
-    _session_store[session['session_id']] = user
-    _app.logger.debug("redirect to root")
-    return redirect_with_baseurl('/')
-
-
-def create_error(message, exception = None):
-    """
-    Print the error and output it to the page
-    :param message:
-    :return: redirects to index.html with the error message
-    """
-    print 'Caught error!'
-    print message, exception
-    if _app:
-        user = None
-        if 'session_id' in session:
-            user = _session_store.get(session['session_id'])
-        return render_template('index.html',
-                               server_name=urlparse(_config['authorization_endpoint']).netloc,
-                               session=user,
-                               error=message)
-
-
-def load_config():
-    """
-    Load config from the file given by argument, or settings.json
-    :return:
-    """
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
     else:
-        filename = 'settings.json'
-    config = Config(filename)
-
-    return config.load_config()
-
-
-def redirect_with_baseurl(path):
-    return redirect(_base_url + path)
-
+        access_token = OAuth2Credentials.from_json(oidc.credentials_store[user_id]).access_token
+        session["access_token"] = access_token
+    try:
+        
+        _app.logger.debug("call api")
+        
+        
+        session["id_token_json"] = OAuth2Credentials.from_json(oidc.credentials_store[user_id]).id_token_jwt
+        print('access_token=<%s>' % access_token)
+        headers = {'Authorization': 'Bearer %s' % (access_token)}
+        # YOLO
+        _app.logger.debug("call %s with header %s" % (api_url, str(headers) ))
+        api_response = requests.get(api_url, headers=headers)
+        if "api_response" not in session:
+            session["api_response"] = {}
+        session["api_response"]["data"] = api_response.text
+        session["api_response"]["code"] = api_response.status_code
+    except Exception as e:
+        print("Could not access greeting-service")
+        print(e)
+    
+    return render_template('index.html')
 
 if __name__ == '__main__':
-    # load the config
-    _config = load_config()
-    _app.logger.debug(str(_config))
-    _client = Client(_config)
-
-    # load the jwk set.
-    if 'jwks_uri' in _config:
-        _jwt_validator = JwtValidator(_config)
-    else:
-        print 'Found no url to JWK set, will not be able to validate JWT signature.'
-        _jwt_validator = None
-
-    # create a session store
-    _session_store = {}
-
-    # initiate the app
-    _app.secret_key = generate_random_string()
-
     # some default values
-    _debug = 'debug' in _config and _config['debug']
-    if 'port' in _config:
-        _port = _config['port']
-    else:
-        _port = 5443
-    _disable_https = 'disable_https' in _config and _config['disable_https']
-    if 'base_url' in _config:
-        _base_url = _config['base_url']
-    else:
-        _base_url = ''
+    
 
-    if _disable_https:
-        _app.run('0.0.0.0', debug=_debug, port=_port)
-    else:
-        _app.run('0.0.0.0', debug=_debug, port=_port, ssl_context=('keys/localhost.pem', 'keys/localhost.pem'))
+    _port = 5443
+    
+    _app.run('0.0.0.0', debug=True, port=_port, ssl_context=('keys/localhost.pem', 'keys/localhost.pem'))
