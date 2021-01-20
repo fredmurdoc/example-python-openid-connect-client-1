@@ -9,8 +9,8 @@
 # For further information, please contact Curity AB.
 #
 
-FROM python:2.7
-MAINTAINER Curity AB
+FROM python:3
+
 
 ADD requirements.txt /usr/src/
 RUN pip install --no-cache-dir -r /usr/src/requirements.txt
@@ -23,6 +23,6 @@ ADD keys /oidc-example/keys
 ADD static /oidc-example/static
 ADD templates /oidc-example/templates
 ADD settings.json /oidc-example/settings.json
-ADD *.py /oidc-example/
+ADD app.py /oidc-example/
 
 ENTRYPOINT ["python", "app.py"]
